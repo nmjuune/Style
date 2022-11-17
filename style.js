@@ -1,13 +1,13 @@
 /**
  * @author Junpei Nomura
- * @version v.2.0.0
+ * @version v.1.1.0
  * memo: displayのショートカットメソッド（要検討）
  */
 
 /**
  * JavaScriptでCSSのスタイリングをするクラス
  */
-export default class Style {
+ export default class Style {
 
     // プライベートプロパティ
 
@@ -30,7 +30,9 @@ export default class Style {
 
         if (typeof DOMElement === 'string' || DOMElement instanceof String) {
             if(DOMElement.includes('.')) {
+                console.log(DOMElement)
                 this.#element = document.getElementsByClassName(DOMElement.replace('.', ''));
+                if (this.#element.length === 0) this.#element = document.querySelectorAll(DOMElement);
             } else if (DOMElement.includes('#')) {
                 this.#element = document.getElementById(DOMElement.replace('#', ''));
             } else {
@@ -77,22 +79,58 @@ export default class Style {
      */
     _hover = (CSSpropertyObj, mouseover, mouseout) => {
 
-        const currentStyle = JSON.stringify(this.#element.style);
+        let currentStyle;
         const mouseEvent = ['mouseover', 'mouseout'];
 
-        this.#element.addEventListener(mouseEvent[0], () => hover(CSSpropertyObj));
-        this.#element.addEventListener(mouseEvent[1], () => hover(JSON.parse(currentStyle)));
+        if (this.#element instanceof HTMLElement) {
 
-        if (typeof mouseover !== 'undefined') this.#element.addEventListener(mouseEvent[0], (e) => mouseover(e));
-        if (typeof mouseout !== 'undefined') this.#element.addEventListener(mouseEvent[1], (e) => mouseout(e));
+            currentStyle = JSON.stringify(this.#element.style);
 
-        const hover = (styleObj) => {
-            for (let property in styleObj) {
-                if (isNaN(property)) {
-                    if (typeof this[property] !== 'undefined') {
-                        this[property](styleObj[property]);
+            this.#element.addEventListener(mouseEvent[0], (e) => hover(CSSpropertyObj, e));
+            this.#element.addEventListener(mouseEvent[1], (e) => hover(JSON.parse(currentStyle), e));
+
+            if (typeof mouseover !== 'undefined') this.#element.addEventListener(mouseEvent[0], (e) => mouseover(e));
+            if (typeof mouseout !== 'undefined') this.#element.addEventListener(mouseEvent[1], (e) => mouseout(e));
+
+        } else {
+            for (let i = 0; i < this.#element.length; i++) {
+
+                currentStyle = JSON.stringify(this.#element[i].style);
+
+                this.#element[i].addEventListener(mouseEvent[0], (e) => hover(CSSpropertyObj, e));
+                this.#element[i].addEventListener(mouseEvent[1], (e) => hover(JSON.parse(currentStyle), e));
+
+                if (typeof mouseover !== 'undefined') this.#element[i].addEventListener(mouseEvent[0], (e) => mouseover(e));
+                if (typeof mouseout !== 'undefined') this.#element[i].addEventListener(mouseEvent[1], (e) => mouseout(e));
+
+
+            }
+        }
+
+
+        const hover = (styleObj, e) => {
+            if (this.#element instanceof HTMLElement) {
+                for (let property in styleObj) {
+                    if (isNaN(property)) {
+                        if (typeof this[property] !== 'undefined') {
+                            this[property](styleObj[property]);
+                        }
                     }
                 }
+
+            } else {
+
+                const $target = e.currentTarget;
+                this.#newStyle = new Style ($target);
+
+                for (let property in styleObj) {
+                    if (isNaN(property)) {
+                        if (typeof this.#newStyle[property] !== 'undefined') {
+                            this.#newStyle[property](styleObj[property]);
+                        }
+                    }
+                }
+
             }
         }
 
