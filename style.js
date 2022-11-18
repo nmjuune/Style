@@ -1,6 +1,6 @@
 /**
  * @author Junpei Nomura
- * @version v.1.1.0
+ * @version v.2.0.0
  * memo: displayのショートカットメソッド（要検討）
  */
 
@@ -10,11 +10,15 @@
  export default class Style {
 
     // プライベートプロパティ
-
     /**
      * @type {string | HTMLElement | HTMLCollectionOf<Element>} DOM要素
      */
     #element;
+
+    /**
+     * @type {string} 「#」や「.」のstringでコンストラクターを作る時に一時的に保存するプロパティ
+     */
+    #elementName;
 
     /**
      * @type {Style} このコンストラクターを引き継がずにメソッドチェーンで新たなコンストラクターを作るためのインスタンス
@@ -29,12 +33,13 @@
     constructor (DOMElement, CSSpropertyObj) {
 
         if (typeof DOMElement === 'string' || DOMElement instanceof String) {
+            this.#elementName = DOMElement;
             if(DOMElement.includes('.')) {
-                console.log(DOMElement)
                 this.#element = document.getElementsByClassName(DOMElement.replace('.', ''));
                 if (this.#element.length === 0) this.#element = document.querySelectorAll(DOMElement);
             } else if (DOMElement.includes('#')) {
                 this.#element = document.getElementById(DOMElement.replace('#', ''));
+                if (this.#element.length === 0) this.#element = document.querySelectorAll(DOMElement);
             } else {
                 this.#element = document.querySelectorAll(DOMElement);
             }
@@ -61,9 +66,15 @@
         return this.#newStyle;
     }
 
+    _and = (DOMElement, CSSpropertyObj) => {
+        console.log(this.#elementName)
+        this.#newStyle = new Style(`${this.#elementName}${DOMElement}`, CSSpropertyObj);
+        return this.#newStyle;
+    }
+
     /**
      * 前記までのコンストラクターの情報をもとにアニメーションなどをユーザが定義するコールバック関数
-     * @param {(argument: this) => void?} userFunction ユーザ定義の関数
+     * @param {(argument: this) => void?} userFunction ユーザ定義の関数(引数に現在のコンストラクターを入れる)
      * @returns {this}
      */
     _function = (userFunction) => {
@@ -213,7 +224,7 @@
      * @param {string} value 適用させるCSSプロパティの値
      * @returns {void | StringConstructor | string[]}
      */
-    margin = (value) => this.#applyCSSstyle(value, this.height.name);
+    margin = (value) => this.#applyCSSstyle(value, this.margin.name);
 
     /**
      * 枠外の余白(上)を指定するメソッド
@@ -943,6 +954,13 @@
      * @returns {void | StringConstructor | string[]}
      */
     columnFill = (value) => this.#applyCSSstyle(value, this.columnFill.name);
+
+    /**
+     * 
+     * @param {string} value 適用させるCSSプロパティの値
+     * @returns {void | StringConstructor | string[]}
+     */
+    gap = (value) => this.#applyCSSstyle(value, this.gap.name);
 
     /**
      * 
