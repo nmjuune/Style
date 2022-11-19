@@ -2,4 +2,4 @@
 
 ___
 
-## This Class uses like CSS and SASS(SCSS).
+## This Class　is able to use like CSS and SASS(SCSS).
