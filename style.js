@@ -1,54 +1,15 @@
 /**
  * @author Junpei Nomura
  * @version v.2.0.0α
- * memo
- * displayのショートカットメソッド（要検討）
- * ホバーのマウスアウトした時の初期値にrevertを代入しているため要検討
  */
-
-
-/* ---------------------------------------------------------------------------------------------------- */
-
-// ページ読み込み時のtransitionを無効にする処理
-((d) => {
-
-    const styleTag = d.createElement('style');
-    styleTag.dataset.classStyle = 'class_style';
-    d.head.appendChild(styleTag);
-    d.body.className = 'preload';
-
-    /**
-     * @type {CSSStyleSheet}
-     */
-    let styleSheet;
-
-    Array.from(d.styleSheets).forEach(thisStyleSheet =>{
-        const ownerNode = thisStyleSheet.ownerNode;
-        if(ownerNode.dataset.classStyle === 'class_style'){
-            styleSheet = thisStyleSheet;
-        }
-    });
-
-    styleSheet.insertRule('.preload * { -webkit-transition: none !important; -moz-transition: none !important; -ms-transition: none !important; -o-transition: none !important; transition: none !important; }', styleSheet.cssRules.length);
-
-    window.addEventListener('load', () => {
-        delete d.body.classList.remove('preload');
-        delete styleTag.remove();
-    });
-
-})(document);
-
-
-/* ---------------------------------------------------------------------------------------------------- */
-
 
 /**
  * JavaScriptでCSSのスタイリングをするクラス
  */
-export class Style {
+ export class Style {
 
     /**
-     * @typedef {' %' | ' ch' | ' cm' | ' em' | ' ex' | ' fr' | ' in' | ' mm' | ' pc' | ' pt' | ' px' | ' rem' | ' vh' | ' vmax' | ' vmin' | ' vh'} unit 単位
+     * @typedef {'%' | 'ch' | 'cm' | 'em' | 'ex' | 'fr' | 'in' | 'mm' | 'pc' | 'pt' | 'px' | 'rem' | 'vh' | 'vmax' | 'vmin' | 'vh'} unit 単位
      * @typedef {'block' | 'inline' | 'inline-block' | 'flex' | 'inline-flex' | 'grid' | 'inline-grid' | 'flow-root' | 'none' | 'contents' | 'block flow' | 'inline flow' | 'inline flow-root' | 'block flex' | 'inline flex' | 'block grid' | 'inline grid' | 'block flow-root' | 'table' | 'table-row' | 'list-item' | 'inherit' | 'initial' | 'revert' | 'revert-layer' | 'unset'} display
      */
 
@@ -287,6 +248,10 @@ export class Style {
 
 
     // プライベートプロパティ
+
+
+    #init = true;
+
     /**
      * @type {string | HTMLElement | HTMLCollectionOf<Element>} DOM要素
      */
@@ -308,13 +273,43 @@ export class Style {
     #currentStyle;
 
     /**
+     * @type {CSSStyleSheet} Styleクラスで使用するスタイルシート
+     */
+    #styleSheet;
+
+    /**
      * マウスイベントの文字列を格納するプライベートプロパティ
      */
     #mouseEvent = {
         click: 'click',
-        mouseover: 'mouseover',
-        mouseout: 'mouseout'
+        hover: ['mouseover', 'mouseout']
     };
+
+    /**
+     * @type {boolean} クリックイベントのステート
+     */
+    #clickState = true;
+
+    /**
+     * @type {Style[]} イベントを適用させた要素を格納
+     */
+    #Array_constructor = [];
+
+    /**
+     * @type {number} イベントを適用させた要素を照合させるためのインデックス
+     */
+    #constructorIndex = 0;
+
+
+    /**
+     * @type {CSSpropertyObj} クリックした時のスタイル
+     */
+    #clickStyle;
+
+    /**
+     * @type {CSSpropertyObj} ホバーした時のスタイル
+     */
+    #hoverStyle;
 
 
     /**
@@ -349,10 +344,37 @@ export class Style {
             }
         }
 
-        // CSSpropertyObjがあった場合の処理
-        if (typeof CSSpropertyObj !== 'undefined' && typeof CSSpropertyObj === 'object') {
-            for (let property in CSSpropertyObj) {
-                this.#applyCSSstyle(CSSpropertyObj[property], property);
+        // Styleクラスで記述するスタイルシートを取得（スタイルシートは一番下のクラス構文外で定義している）
+        Array.from(document.styleSheets).forEach(stylesheet => {
+            const ownerNode = stylesheet.ownerNode;
+            if (ownerNode.dataset.classStyle === 'class_style') {
+                this.#styleSheet = stylesheet;
+            }
+        });
+
+        // 最初のスタイリングはstyleタグに記述していく
+        if (this.#init && typeof this.#elementName !== 'undefined') {
+            // CSSpropertyObjがあった場合の処理
+            if (typeof CSSpropertyObj !== 'undefined' && typeof CSSpropertyObj === 'object') {
+
+                const toLower = (s) => `-${s.toLowerCase()}`;
+                let cssStyle = '';
+                for (let property in CSSpropertyObj) {
+                    if (/[A-Z]/g.test(property)) {
+                        const CSSproperty = property.replace(/[A-Z]/g,toLower);
+                        cssStyle += `${CSSproperty}: ${CSSpropertyObj[property]};`;
+                    } else {
+                        cssStyle += `${property}: ${CSSpropertyObj[property]};`;
+                    }
+                }
+                cssStyle = `${this.#elementName} { ${cssStyle} }`;
+                this.#styleSheet.insertRule(cssStyle);
+            }
+        } else {
+            if (typeof CSSpropertyObj !== 'undefined' && typeof CSSpropertyObj === 'object') {
+                for (let property in CSSpropertyObj) {
+                    this.#applyCSSstyle(CSSpropertyObj[property], property);
+                }
             }
         }
 
@@ -397,70 +419,230 @@ export class Style {
     }
 
     /**
-     * ホバー時のスタイルを指定
+     * this.#Array_constructorにイベントを適用されたオブジェクトを追加する
+     * @param {CSSpropertyObj} styleObj CSSのスタイリング情報が入ったオブジェクト
+     * @param {MouseEvent} e マウスイベント
+     * @return {Style[]}
+     */
+    #addEventToArray = (e) => {
+
+        const $target = e.currentTarget;
+
+        if (this.#Array_constructor.length === 0) {
+            let instance = new Style($target);
+            instance.#clickStyle = this.#clickStyle;
+            instance.#hoverStyle = this.#hoverStyle;
+            this.#Array_constructor.push(instance);
+        } else {
+            for (let i = 0; i < this.#Array_constructor.length; i++) {
+                if (this.#Array_constructor[i].#constructorIndex === i && this.#Array_constructor[i].#element === $target) {
+                    break;
+                }
+                if (this.#Array_constructor[i].#element !== $target && i === this.#Array_constructor.length - 1) {
+                    let instance = new Style($target);
+                    instance.#clickStyle = this.#clickStyle;
+                    instance.#hoverStyle = this.#hoverStyle;
+                    instance.#constructorIndex = i + 1;
+                    this.#Array_constructor.push(instance);
+                }
+            }
+        }
+
+        return this.#Array_constructor;
+
+    }
+
+    /**
+     * ホバー時のスタイルを指定するメソッド
      * @param {CSSpropertyObj} CSSpropertyObj CSSのプロパティと値のオブジェクト
      * @param {(argument: MouseEvent) => void?} mouseover マウスポインターが要素に乗っている時のユーザ定義のコールバック関数
      * @param {(argument: MouseEvent) => void?} mouseout マウスポインターが要素を出た時のユーザ定義のコールバック関数
      */
     _hover = (CSSpropertyObj, mouseover, mouseout) => {
 
-        // noneで効かないプロパティがあるためrevertを使う
-        for (let property in CSSpropertyObj) {
-            if (!this.#currentStyle[property]) {
-                this.#currentStyle[property] = 'revert';
-            }
-        }
+        this.#hoverStyle = CSSpropertyObj;
 
         if (this.#element instanceof HTMLElement) {
 
-            this.#element.addEventListener(this.#mouseEvent.mouseover, (e) => hover(CSSpropertyObj, e));
-            this.#element.addEventListener(this.#mouseEvent.mouseout, (e) => hover(this.#currentStyle, e));
+            this.#mouseEvent.hover.forEach(hoverEvent => this.#element.addEventListener(hoverEvent, (e) => this.#hover(CSSpropertyObj, e, hoverEvent)));
 
-            if (typeof mouseover !== 'undefined') this.#element.addEventListener(this.#mouseEvent.mouseover, (e) => mouseover(e));
-            if (typeof mouseout !== 'undefined') this.#element.addEventListener(this.#mouseEvent.mouseout, (e) => mouseout(e));
+            if (typeof mouseover !== 'undefined') this.#element.addEventListener(this.#mouseEvent.hover[0], (e) => mouseover(e));
+            if (typeof mouseout !== 'undefined') this.#element.addEventListener(this.#mouseEvent.hover[1], (e) => mouseout(e));
 
         } else {
             for (let i = 0; i < this.#element.length; i++) {
 
-                this.#element[i].addEventListener(this.#mouseEvent.mouseover, (e) => hover(CSSpropertyObj, e));
-                this.#element[i].addEventListener(this.#mouseEvent.mouseout, (e) => hover(this.#currentStyle, e));
+                this.#mouseEvent.hover.forEach(hoverEvent => this.#element[i].addEventListener(hoverEvent, (e) => this.#hover(CSSpropertyObj, e, hoverEvent)));
 
-                if (typeof mouseover !== 'undefined') this.#element[i].addEventListener(this.#mouseEvent.mouseover, (e) => mouseover(e));
-                if (typeof mouseout !== 'undefined') this.#element[i].addEventListener(this.#mouseEvent.mouseout, (e) => mouseout(e));
+                if (typeof mouseover !== 'undefined') this.#element[i].addEventListener(this.#mouseEvent.hover[0], (e) => mouseover(e));
+                if (typeof mouseout !== 'undefined') this.#element[i].addEventListener(this.#mouseEvent.hover[1], (e) => mouseout(e));
 
-
-            }
-        }
-
-
-        const hover = (styleObj, e) => {
-            if (this.#element instanceof HTMLElement) {
-                for (let property in styleObj) {
-                    if (isNaN(property)) {
-                        if (typeof this[property] !== 'undefined') {
-                            this[property](styleObj[property]);
-                        }
-                    }
-                }
-
-            } else {
-
-                const $target = e.currentTarget;
-                this.#newStyle = new Style ($target);
-
-                for (let property in styleObj) {
-                    if (isNaN(property)) {
-                        if (typeof this.#newStyle[property] !== 'undefined') {
-                            this.#newStyle[property](styleObj[property]);
-                        }
-                    }
-                }
 
             }
         }
 
         return this;
 
+    }
+
+    /**
+     * ホバーした時の処理
+     * @param {CSSpropertyObj} styleObj CSSのスタイリング情報が入ったオブジェクト
+     * @param {MouseEvent} e クリックイベント
+     * @param {'mouseover' | 'mouseout'} type マウスホバーのタイプ
+     * @return {void}
+     */
+    #hover = (styleObj, e, type) => {
+
+        const $target = e.currentTarget;
+
+        this.#addEventToArray(e).forEach(obj => {
+            if (obj.#element === $target) {
+
+                obj.#currentStyle = this.#currentStyle;
+
+                for (let property in $target.style) {
+                    if (isNaN(property)) {
+                        if (typeof obj.#currentStyle[property] === 'undefined' && typeof this[property] !== 'undefined') {
+                            obj.#currentStyle[property] = $target.style[property];
+                        }
+                    }
+                }
+
+                if (type === this.#mouseEvent.hover[1]) {
+                    if (obj._isClickToggle()) {
+                        for (let property in obj.#currentStyle) {
+                            if (!obj.#clickStyle[property] && obj.#hoverStyle[property]) {
+                                if (obj.#hoverStyle[property]) {
+                                    obj[property]('revert');
+                                }
+                            }
+                        }
+                    } else {
+                        for (let property in obj.#currentStyle) {
+                            obj[property](obj.#currentStyle[property]);
+                        }
+                    }
+                } else {
+                    if (obj._isClickToggle()) {
+                        for (let property in obj.#currentStyle) {
+                            if (!obj.#clickStyle[property] && obj.#hoverStyle[property]) {
+                                if (obj.#hoverStyle[property]) {
+                                    obj[property](obj.#hoverStyle[property]);
+                                }
+                            }
+                        }
+                    } else {
+                        for (let property in this.#hoverStyle) {
+                            obj[property](this.#hoverStyle[property]);
+                        }
+                    }
+                }
+            }
+        });
+
+    }
+
+    /**
+     * クリック時のスタイルを指定するメソッド
+     * @param {CSSpropertyObj} CSSpropertyObj CSSのプロパティと値のオブジェクト
+     * @param {(argument1: MouseEvent, argument2: this) => void?} click ユーザが定義するクリックイベントのコールバック関数
+     */
+    _click = (CSSpropertyObj, click) => {
+        this.#clickStyle = CSSpropertyObj;
+
+        if (this.#element instanceof HTMLElement) {
+
+            this.#element.addEventListener(this.#mouseEvent.mouseover, (e) => this.#clickHandler(CSSpropertyObj, e));
+
+            if (typeof mouseover !== 'undefined') this.#element.addEventListener(this.#mouseEvent.click, (e) => click(e, this.#searchConstructor(this.#element, this.#Array_constructor)));
+
+        } else {
+
+
+            for (let i = 0; i < this.#element.length; i++) {
+
+                this.#element[i].addEventListener(this.#mouseEvent.click, (e) => this.#clickHandler(CSSpropertyObj, e));
+
+                if (typeof click !== 'undefined') this.#element[i].addEventListener(this.#mouseEvent.click, (e) => click(e, this.#searchConstructor(this.#element[i], this.#Array_constructor)));
+
+            }
+        }
+
+        return this;
+
+    }
+
+    /**
+     * クリックしている(イベントを発火させている要素)Styleコンストラクターを探す
+     * @param {HTMLElement} $elm DOM要素
+     * @param {Style[]} Array_constructor イベントを適用させた要素の配列
+     * @return {Style}
+     */
+    #searchConstructor = ($elm, Array_constructor) => {
+        let constructorObj;
+        Array_constructor.forEach(obj => {
+            if (obj.#element === $elm) {
+                constructorObj = obj;
+            }
+        });
+        return constructorObj;
+    };
+
+    /**
+     * クリックした時の処理
+     * @param {CSSpropertyObj} styleObj CSSのスタイリング情報が入ったオブジェクト
+     * @param {MouseEvent} e クリックイベント
+     * @return {void}
+     */
+    #clickHandler = (styleObj, e) => {
+
+        e.preventDefault();
+        const $target = e.currentTarget;
+        let $targetStyleObj = this.#currentStyle;
+
+
+        for (let property in $target.style) {
+            if (isNaN(property)) {
+                if (typeof $targetStyleObj[property] === 'undefined' && typeof this[property] !== 'undefined') {
+                    $targetStyleObj[property] = $target.style[property];
+                }
+            }
+        }
+
+        this.#addEventToArray(e).forEach(obj => {
+            if (obj.#element === $target) {
+                if (obj.#clickState) {
+                    for (let property in styleObj) {
+                        obj[property](styleObj[property]);
+                    }
+                    obj.#clickState = false;
+                } else {
+                    for (let property in obj.#clickStyle) {
+                        if (obj.#clickStyle[property] && obj.#hoverStyle[property]) {
+                            obj[property](obj.#hoverStyle[property]);
+                        } else {
+                            obj[property]('revert');
+                        }
+                    }
+                    obj.#clickState = true;
+                }
+            }
+        });
+
+    }
+
+    /**
+     * 要素をクリック（トグル）したかどうか条件値として返す
+     * @return {boolean}
+     */
+    _isClickToggle = () => {
+        // 仕様上、要素を1回クリックするとfalseが返るため返り値を期待の値に変換する
+        if (this.#clickState) {
+            return false;
+        } else {
+            return true;
+        }
     }
 
     // ここでCSSのスタイリングをする機関部
@@ -2096,3 +2278,41 @@ export class Style {
     zIndex = (value) => this.#applyCSSstyle(value, this.zIndex.name);
 
 }
+
+
+
+/* ---------------------------------------------------------------------------------------------------- */
+
+// ページ読み込み時のtransitionを無効にする処理とStyleクラスで使うstyleSheetをheadタグに追加
+((d) => {
+
+    'use strict'
+
+    const styleTag = d.createElement('style');
+    styleTag.dataset.classStyle = 'class_style';
+    d.head.appendChild(styleTag);
+    d.body.className = 'preload';
+
+    /**
+     * @type {CSSStyleSheet}
+     */
+    let styleSheet;
+
+    Array.from(d.styleSheets).forEach(thisStyleSheet =>{
+        const ownerNode = thisStyleSheet.ownerNode;
+        if(ownerNode.dataset.classStyle === 'class_style'){
+            styleSheet = thisStyleSheet;
+        }
+    });
+
+    styleSheet.insertRule('.preload * { -webkit-transition: none !important; -moz-transition: none !important; -ms-transition: none !important; -o-transition: none !important; transition: none !important; }', styleSheet.cssRules.length);
+
+    window.addEventListener('load', () => {
+        d.body.classList.remove('preload');
+        Array.from(styleSheet.cssRules).forEach((CSSStyleRule, i) => {if (CSSStyleRule.selectorText === '.preload *') delete styleSheet.deleteRule(i);});
+    });
+
+})(document);
+
+
+/* ---------------------------------------------------------------------------------------------------- */
