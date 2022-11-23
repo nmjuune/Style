@@ -6,11 +6,11 @@
 /**
  * JavaScriptでCSSのスタイリングをするクラス
  */
- export class Style {
+ class Style {
 
     /**
-     * @typedef {'%' | 'ch' | 'cm' | 'em' | 'ex' | 'fr' | 'in' | 'mm' | 'pc' | 'pt' | 'px' | 'rem' | 'vh' | 'vmax' | 'vmin' | 'vh'} unit 単位
-     * @typedef {'block' | 'inline' | 'inline-block' | 'flex' | 'inline-flex' | 'grid' | 'inline-grid' | 'flow-root' | 'none' | 'contents' | 'block flow' | 'inline flow' | 'inline flow-root' | 'block flex' | 'inline flex' | 'block grid' | 'inline grid' | 'block flow-root' | 'table' | 'table-row' | 'list-item' | 'inherit' | 'initial' | 'revert' | 'revert-layer' | 'unset'} display
+     * @typedef {'%' | 'ch' | 'cm' | 'em' | 'ex' | 'fr' | 'in' | 'mm' | 'pc' | 'pt' | 'px' | 'rem' | 'vh' | 'vmax' | 'vmin' | 'vh'} unit 単位の予測変換
+     * @typedef {'block' | 'inline' | 'inline-block' | 'flex' | 'inline-flex' | 'grid' | 'inline-grid' | 'flow-root' | 'none' | 'contents' | 'block flow' | 'inline flow' | 'inline flow-root' | 'block flex' | 'inline flex' | 'block grid' | 'inline grid' | 'block flow-root' | 'table' | 'table-row' | 'list-item' | 'inherit' | 'initial' | 'revert' | 'revert-layer' | 'unset'} display displayプロパティの予測変換
      */
 
     /**
@@ -249,7 +249,9 @@
 
     // プライベートプロパティ
 
-
+    /**
+     * @type {boolean} 最初だけコンストラクターを通す
+     */
     #init = true;
 
     /**
@@ -327,15 +329,17 @@
 
                 this.#elementName = DOMElement;
 
-                if(DOMElement.includes('.')) {
-                    this.#element = document.getElementsByClassName(DOMElement.replace('.', ''));
-                    if (this.#element.length === 0) this.#element = document.querySelectorAll(DOMElement);
-                } else if (DOMElement.includes('#')) {
-                    this.#element = document.getElementById(DOMElement.replace('#', ''));
-                    if (this.#element.length === 0) this.#element = document.querySelectorAll(DOMElement);
-                } else {
-                    this.#element = document.querySelectorAll(DOMElement);
-                }
+                window.addEventListener('DOMContentLoaded', () => {
+                    if(DOMElement.includes('.')) {
+                        this.#element = document.getElementsByClassName(DOMElement.replace('.', ''));
+                        if (this.#element.length === 0) this.#element = document.querySelectorAll(DOMElement);
+                    } else if (DOMElement.includes('#')) {
+                        this.#element = document.getElementById(DOMElement.replace('#', ''));
+                        if (this.#element.length === 0) this.#element = document.querySelectorAll(DOMElement);
+                    } else {
+                        this.#element = document.querySelectorAll(DOMElement);
+                    }
+                });
 
             } else {
 
@@ -356,7 +360,6 @@
         if (this.#init && typeof this.#elementName !== 'undefined') {
             // CSSpropertyObjがあった場合の処理
             if (typeof CSSpropertyObj !== 'undefined' && typeof CSSpropertyObj === 'object') {
-
                 const toLower = (s) => `-${s.toLowerCase()}`;
                 let cssStyle = '';
                 for (let property in CSSpropertyObj) {
@@ -462,24 +465,25 @@
 
         this.#hoverStyle = CSSpropertyObj;
 
-        if (this.#element instanceof HTMLElement) {
+        window.addEventListener('DOMContentLoaded', () => {
+            if (this.#element instanceof HTMLElement) {
 
-            this.#mouseEvent.hover.forEach(hoverEvent => this.#element.addEventListener(hoverEvent, (e) => this.#hover(CSSpropertyObj, e, hoverEvent)));
+                this.#mouseEvent.hover.forEach(hoverEvent => this.#element.addEventListener(hoverEvent, (e) => this.#hover(CSSpropertyObj, e, hoverEvent)));
 
-            if (typeof mouseover !== 'undefined') this.#element.addEventListener(this.#mouseEvent.hover[0], (e) => mouseover(e));
-            if (typeof mouseout !== 'undefined') this.#element.addEventListener(this.#mouseEvent.hover[1], (e) => mouseout(e));
+                if (typeof mouseover !== 'undefined') this.#element.addEventListener(this.#mouseEvent.hover[0], (e) => mouseover(e));
+                if (typeof mouseout !== 'undefined') this.#element.addEventListener(this.#mouseEvent.hover[1], (e) => mouseout(e));
 
-        } else {
-            for (let i = 0; i < this.#element.length; i++) {
+            } else {
+                for (let i = 0; i < this.#element.length; i++) {
 
-                this.#mouseEvent.hover.forEach(hoverEvent => this.#element[i].addEventListener(hoverEvent, (e) => this.#hover(CSSpropertyObj, e, hoverEvent)));
+                    this.#mouseEvent.hover.forEach(hoverEvent => this.#element[i].addEventListener(hoverEvent, (e) => this.#hover(CSSpropertyObj, e, hoverEvent)));
 
-                if (typeof mouseover !== 'undefined') this.#element[i].addEventListener(this.#mouseEvent.hover[0], (e) => mouseover(e));
-                if (typeof mouseout !== 'undefined') this.#element[i].addEventListener(this.#mouseEvent.hover[1], (e) => mouseout(e));
+                    if (typeof mouseover !== 'undefined') this.#element[i].addEventListener(this.#mouseEvent.hover[0], (e) => mouseover(e));
+                    if (typeof mouseout !== 'undefined') this.#element[i].addEventListener(this.#mouseEvent.hover[1], (e) => mouseout(e));
 
-
+                }
             }
-        }
+        });
 
         return this;
 
@@ -549,25 +553,27 @@
      * @param {(argument1: MouseEvent, argument2: this) => void?} click ユーザが定義するクリックイベントのコールバック関数
      */
     _click = (CSSpropertyObj, click) => {
+
         this.#clickStyle = CSSpropertyObj;
 
-        if (this.#element instanceof HTMLElement) {
+        window.addEventListener('DOMContentLoaded', () => {
+            if (this.#element instanceof HTMLElement) {
 
-            this.#element.addEventListener(this.#mouseEvent.mouseover, (e) => this.#clickHandler(CSSpropertyObj, e));
+                this.#element.addEventListener(this.#mouseEvent.mouseover, (e) => this.#clickHandler(CSSpropertyObj, e));
 
-            if (typeof mouseover !== 'undefined') this.#element.addEventListener(this.#mouseEvent.click, (e) => click(e, this.#searchConstructor(this.#element, this.#Array_constructor)));
+                if (typeof mouseover !== 'undefined') this.#element.addEventListener(this.#mouseEvent.click, (e) => click(e, this.#searchConstructor(this.#element, this.#Array_constructor)));
 
-        } else {
+            } else {
 
+                for (let i = 0; i < this.#element.length; i++) {
 
-            for (let i = 0; i < this.#element.length; i++) {
+                    this.#element[i].addEventListener(this.#mouseEvent.click, (e) => this.#clickHandler(CSSpropertyObj, e));
 
-                this.#element[i].addEventListener(this.#mouseEvent.click, (e) => this.#clickHandler(CSSpropertyObj, e));
+                    if (typeof click !== 'undefined') this.#element[i].addEventListener(this.#mouseEvent.click, (e) => click(e, this.#searchConstructor(this.#element[i], this.#Array_constructor)));
 
-                if (typeof click !== 'undefined') this.#element[i].addEventListener(this.#mouseEvent.click, (e) => click(e, this.#searchConstructor(this.#element[i], this.#Array_constructor)));
-
+                }
             }
-        }
+        });
 
         return this;
 
@@ -2288,10 +2294,12 @@
 
     'use strict'
 
+    const CLASS_PRELOAD = 'preload';
+
     const styleTag = d.createElement('style');
     styleTag.dataset.classStyle = 'class_style';
     d.head.appendChild(styleTag);
-    d.body.className = 'preload';
+    window,addEventListener('DOMContentLoaded', () => d.body.classList.add(CLASS_PRELOAD));
 
     /**
      * @type {CSSStyleSheet}
@@ -2305,14 +2313,13 @@
         }
     });
 
-    styleSheet.insertRule('.preload * { -webkit-transition: none !important; -moz-transition: none !important; -ms-transition: none !important; -o-transition: none !important; transition: none !important; }', styleSheet.cssRules.length);
+    styleSheet.insertRule(`.${CLASS_PRELOAD} * { -webkit-transition: none !important; -moz-transition: none !important; -ms-transition: none !important; -o-transition: none !important; transition: none !important; }`, styleSheet.cssRules.length);
 
     window.addEventListener('load', () => {
-        d.body.classList.remove('preload');
-        Array.from(styleSheet.cssRules).forEach((CSSStyleRule, i) => {if (CSSStyleRule.selectorText === '.preload *') delete styleSheet.deleteRule(i);});
+        d.body.classList.remove(CLASS_PRELOAD);
+        Array.from(styleSheet.cssRules).forEach((CSSStyleRule, i) => {if (CSSStyleRule.selectorText === `.${CLASS_PRELOAD} *`) delete styleSheet.deleteRule(i);});
     });
 
 })(document);
-
 
 /* ---------------------------------------------------------------------------------------------------- */
