@@ -313,6 +313,38 @@
      */
     #hoverStyle;
 
+    /**
+     * CSS変数の:rootみたいな静的メソッド
+     * @param {{}} variable 登録したい変数を格納するオブジェクト
+     * @return {(variableName: string) => string} getVariable関数が返る
+     */
+    static root = (variable) => {
+
+        let Var = {};
+
+        if (typeof variable !== 'object' || typeof variable === 'undefined' || variable instanceof Array) {
+
+            console.error(new Error('There is not variable. Please change to type of Object it.'));
+
+        } else {
+
+            for (let variableName in variable) {
+                Var[variableName] = variable[variableName];
+            }
+
+        }
+
+        /**
+         * 登録した変数を呼び出す関数
+         * @param {string} variableName 登録した変数名を文字列として指定
+         * @return {string} 指定した値
+         */
+        const getVariable = (variableName) => Var[variableName];
+
+        return getVariable;
+
+    }
+
 
     /**
      * 初期のスタイルを指定するコンストラクター
@@ -411,6 +443,61 @@
     }
 
     /**
+     * メディアクエリを適用させる関数
+     * @param {string} breakPoint 丸括弧は除くブレイクポイントの文字列
+     * @param {CSSpropertyObj} CSSpropertyObj CSSのプロパティと値のオブジェクト
+     */
+    _media = (breakPoint, CSSpropertyObj) => {
+        // 最初のスタイリングはstyleタグに記述していく
+        if (this.#init && typeof this.#elementName !== 'undefined') {
+            // CSSpropertyObjがあった場合の処理
+            if (typeof CSSpropertyObj !== 'undefined' && typeof CSSpropertyObj === 'object') {
+                const toLower = (s) => `-${s.toLowerCase()}`;
+                let mediaCssStyle = '';
+                for (let property in CSSpropertyObj) {
+                    if (/[A-Z]/g.test(property)) {
+                        const CSSproperty = property.replace(/[A-Z]/g,toLower);
+                        mediaCssStyle += `${CSSproperty}: ${CSSpropertyObj[property]};`;
+                    } else {
+                        mediaCssStyle += `${property}: ${CSSpropertyObj[property]};`;
+                    }
+                }
+                mediaCssStyle = `@media screen and (${breakPoint}) { ${this.#elementName} { ${mediaCssStyle} } }`;
+                this.#styleSheet.insertRule(mediaCssStyle);
+            }
+        } else {
+            if (typeof CSSpropertyObj !== 'undefined' && typeof CSSpropertyObj === 'object') {
+                if (window.matchMedia(`(${breakPoint})`).matches) {
+                    this.#matchMediaApplyCSSstyle(breakPoint, CSSpropertyObj);
+                    window.addEventListener('resize', () => this.#matchMediaApplyCSSstyle(breakPoint, CSSpropertyObj));
+                } else {
+                    window.addEventListener('resize', () => this.#matchMediaApplyCSSstyle(breakPoint, CSSpropertyObj));
+                }
+            }
+        }
+
+        return this;
+
+    }
+
+    /**
+     * スタイルシートに記述しない部分のメディアクエリ
+     * @param {string} breakPoint 丸括弧は除くブレイクポイントの文字列
+     * @param {CSSpropertyObj} CSSpropertyObj CSSのプロパティと値のオブジェクト
+     */
+    #matchMediaApplyCSSstyle = (breakPoint, CSSpropertyObj) => {
+        if (window.matchMedia(`(${breakPoint})`).matches) {
+            for (let property in CSSpropertyObj) {
+                this.#applyCSSstyle(CSSpropertyObj[property], property);
+            }
+        } else {
+            for (let property in CSSpropertyObj) {
+                this.#applyCSSstyle('revert', property);
+            }
+        }
+    }
+
+    /**
      * 前記までのコンストラクターの情報をもとにアニメーションなどをユーザが定義するコールバック関数
      * @param {(argument: this) => void?} userFunction ユーザ定義の関数(引数に現在のコンストラクターを入れる)
      * @return {Style} Styleオブジェクトを返す
@@ -420,6 +507,12 @@
         userFunction(this);
         return this;
     }
+
+    /**
+     * コンストラクターが持つDOM要素を取得
+     * @return {HTMLElement} コンストラクターが持つプライベート変数に入っているDOM要素を取得する
+     */
+    _getElement = () => this.#element;
 
     /**
      * this.#Array_constructorにイベントを適用されたオブジェクトを追加する
@@ -456,10 +549,26 @@
     }
 
     /**
+     * イベントを発火させているStyleコンストラクター(要素)を探す
+     * @param {HTMLElement} $elm DOM要素
+     * @param {Style[]} Array_constructor イベントを適用させた要素の配列
+     * @return {Style}
+     */
+    #searchConstructor = ($elm, Array_constructor) => {
+        let constructorObj;
+        Array_constructor.forEach(obj => {
+            if (obj.#element === $elm) {
+                constructorObj = obj;
+            }
+        });
+        return constructorObj;
+    };
+
+    /**
      * ホバー時のスタイルを指定するメソッド
      * @param {CSSpropertyObj} CSSpropertyObj CSSのプロパティと値のオブジェクト
-     * @param {(argument: MouseEvent) => void?} mouseover マウスポインターが要素に乗っている時のユーザ定義のコールバック関数
-     * @param {(argument: MouseEvent) => void?} mouseout マウスポインターが要素を出た時のユーザ定義のコールバック関数
+     * @param {(argument1: MouseEvent, argument2: this) => void?} mouseover マウスポインターが要素に乗っている時のユーザ定義のコールバック関数
+     * @param {(argument1: MouseEvent, argument2: this) => void?} mouseout マウスポインターが要素を出た時のユーザ定義のコールバック関数
      */
     _hover = (CSSpropertyObj, mouseover, mouseout) => {
 
@@ -470,16 +579,16 @@
 
                 this.#mouseEvent.hover.forEach(hoverEvent => this.#element.addEventListener(hoverEvent, (e) => this.#hover(CSSpropertyObj, e, hoverEvent)));
 
-                if (typeof mouseover !== 'undefined') this.#element.addEventListener(this.#mouseEvent.hover[0], (e) => mouseover(e));
-                if (typeof mouseout !== 'undefined') this.#element.addEventListener(this.#mouseEvent.hover[1], (e) => mouseout(e));
+                if (typeof mouseover !== 'undefined') this.#element.addEventListener(this.#mouseEvent.hover[0], (e) => mouseover(e, this.#searchConstructor(this.#element, this.#Array_constructor)));
+                if (typeof mouseout !== 'undefined') this.#element.addEventListener(this.#mouseEvent.hover[1], (e) => mouseout(e, this.#searchConstructor(this.#element, this.#Array_constructor)));
 
             } else {
                 for (let i = 0; i < this.#element.length; i++) {
 
                     this.#mouseEvent.hover.forEach(hoverEvent => this.#element[i].addEventListener(hoverEvent, (e) => this.#hover(CSSpropertyObj, e, hoverEvent)));
 
-                    if (typeof mouseover !== 'undefined') this.#element[i].addEventListener(this.#mouseEvent.hover[0], (e) => mouseover(e));
-                    if (typeof mouseout !== 'undefined') this.#element[i].addEventListener(this.#mouseEvent.hover[1], (e) => mouseout(e));
+                    if (typeof mouseover !== 'undefined') this.#element[i].addEventListener(this.#mouseEvent.hover[0], (e) => mouseover(e, this.#searchConstructor(this.#element[i], this.#Array_constructor)));
+                    if (typeof mouseout !== 'undefined') this.#element[i].addEventListener(this.#mouseEvent.hover[1], (e) => mouseout(e, this.#searchConstructor(this.#element[i], this.#Array_constructor)));
 
                 }
             }
@@ -559,9 +668,9 @@
         window.addEventListener('DOMContentLoaded', () => {
             if (this.#element instanceof HTMLElement) {
 
-                this.#element.addEventListener(this.#mouseEvent.mouseover, (e) => this.#clickHandler(CSSpropertyObj, e));
+                this.#element.addEventListener(this.#mouseEvent.click, (e) => this.#clickHandler(CSSpropertyObj, e));
 
-                if (typeof mouseover !== 'undefined') this.#element.addEventListener(this.#mouseEvent.click, (e) => click(e, this.#searchConstructor(this.#element, this.#Array_constructor)));
+                if (typeof click !== 'undefined') this.#element.addEventListener(this.#mouseEvent.click, (e) => click(e, this.#searchConstructor(this.#element, this.#Array_constructor)));
 
             } else {
 
@@ -578,22 +687,6 @@
         return this;
 
     }
-
-    /**
-     * クリックしている(イベントを発火させている要素)Styleコンストラクターを探す
-     * @param {HTMLElement} $elm DOM要素
-     * @param {Style[]} Array_constructor イベントを適用させた要素の配列
-     * @return {Style}
-     */
-    #searchConstructor = ($elm, Array_constructor) => {
-        let constructorObj;
-        Array_constructor.forEach(obj => {
-            if (obj.#element === $elm) {
-                constructorObj = obj;
-            }
-        });
-        return constructorObj;
-    };
 
     /**
      * クリックした時の処理
@@ -2286,10 +2379,10 @@
 }
 
 
-
 /* ---------------------------------------------------------------------------------------------------- */
 
-// ページ読み込み時のtransitionを無効にする処理とStyleクラスで使うstyleSheetをheadタグに追加
+
+// Styleクラスで使うstyleSheetをheadタグに追加とページ読み込み時のtransitionを無効にする処理
 ((d) => {
 
     'use strict'
@@ -2299,7 +2392,7 @@
     const styleTag = d.createElement('style');
     styleTag.dataset.classStyle = 'class_style';
     d.head.appendChild(styleTag);
-    window,addEventListener('DOMContentLoaded', () => d.body.classList.add(CLASS_PRELOAD));
+    window.addEventListener('DOMContentLoaded', () => d.body.classList.add(CLASS_PRELOAD));
 
     /**
      * @type {CSSStyleSheet}
@@ -2321,5 +2414,6 @@
     });
 
 })(document);
+
 
 /* ---------------------------------------------------------------------------------------------------- */
